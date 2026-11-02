@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CoursePilot 演示 · 模拟课程页</title>
+  <link rel="stylesheet" href="./demo.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <span class="brand-name">雨课堂</span>
+      <span class="brand-tag">DEMO</span>
+    </div>
+    <div class="crumb">数据结构与算法 · 第 3 章 树与二叉树</div>
+    <div class="user">
+      <span class="avatar">同</span>
+      <span>同学 A</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="stage">
+      <div class="player" id="playerBox">
+        <video id="player" playsinline></video>
+        <div class="player-top">
+          <span class="live-dot"></span>
+          <span id="lessonName">3.1 二叉树的定义</span>
+        </div>
+        <div class="player-center">
+          <p class="player-tip">这是模拟播放器，倍速与进度由右下角 CoursePilot 面板驱动</p>
+        </div>
+        <div class="controls">
+          <button id="playPause" class="ctl">播放</button>
+          <div class="timeline"><div class="timeline-fill" id="fill"></div></div>
+          <span class="clock" id="clock">0:00 / 10:00</span>
+          <button id="nextBtn" class="ctl primary">下一节</button>
+        </div>
+      </div>
+
+      <div class="doc" id="docView" hidden>
+        <article class="doc-body" id="docBody">
+          <h3>3.1 二叉树的定义</h3>
+          <p>二叉树是每个节点最多有两棵子树的树结构，两个子树有左右之分，其次序不能任意颠倒。</p>
+          <p>二叉树常被用于实现二叉查找树和二叉堆。每个节点最多只有两个子树，即使只有一棵子树也要区分左右。</p>
+          <p>满二叉树：一棵深度为 k 且有 2^k - 1 个节点的二叉树。完全二叉树：深度为 k 且前 k-1 层都是满的，第 k 层节点集中在左边。</p>
+          <p>性质一：第 i 层最多有 2^(i-1) 个节点。性质二：深度为 k 的二叉树最多有 2^k - 1 个节点。</p>
+          <p>性质三：对任意一棵二叉树，如果叶子节点数为 n0，度为 2 的节点数为 n2，则 n0 = n2 + 1。</p>
+          <p>二叉树的存储结构分为顺序存储与链式存储。顺序存储适合完全二叉树，链式存储使用左右孩子指针。</p>
+          <p>遍历方式分为先序、中序、后序与层序。先序为根左右，中序为左根右，后序为左右根。</p>
+          <p>本节结束前请对照课件中的示例图，画出三种遍历序列，并思考递归与非递归实现的差异。</p>
+          <p>（以上为演示文本，仅用于验证自动阅读与滚动节奏。）</p>
+          <p>继续向下滚动可以看到更多内容，CoursePilot 会按设定节奏推进，读到底后自动进入下一节。</p>
+          <p>这一段是为了让容器产生足够的滚动高度，确保“到顶/到底”的判定与进度条都能正常变化。</p>
+          <p>阅读节奏与视频倍速共用同一个控件：4× 表示每秒滚动 64 像素。</p>
+        </article>
+      </div>
+
+      <div class="tools">
+        <span class="tools-label">演示工具</span>
+        <button class="ghost" id="modeBtn">切换到图文</button>
+        <button class="ghost" id="quizBtn">模拟弹题</button>
+        <button class="ghost" id="resetBtn">重置进度</button>
+        <span class="tools-hint">面板默认 4× 加速；播放结束后 3 秒自动切下一节。</span>
+      </div>
+
+      <div class="materials">
+        <span class="materials-label">课程资料</span>
+        <a href="./sample-material.txt" download>课程讲义.txt</a>
+      </div>
+
+      <article class="notes">
+        <h2>本节要点</h2>
+        <ul>
+          <li>二叉树是每个节点最多有两棵子树的树结构，子树有左右之分。</li>
+          <li>满二叉树与完全二叉树的区别在于最后一层节点的填充方式。</li>
+          <li>后续章节将介绍先序、中序、后序与层序遍历。</li>
+        </ul>
+      </article>
+    </section>
+
+    <aside class="side">
+      <div class="side-head">
+        <h2>课程目录</h2>
+        <span id="progressText">1 / 5</span>
+      </div>
+      <ol class="lessons catalog" id="lessons"></ol>
+      <div class="side-foot">
+        CoursePilot 演示页面：仅模拟课程结构，不含任何真实平台数据。
+      </div>
+    </aside>
+  </main>
+
+  <script src="../dist/coursepilot.user.js"></script>
+  <script src="./demo.js"></script>
+</body>
+</html>

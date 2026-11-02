@@ -1,0 +1,15 @@
+{
+  "name": "coursepilot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CoursePilot - 多平台网课播放托管助手（图形化悬浮面板）",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "demo": "node scripts/serve.mjs",
+    "check": "node --check src/main.js && node --check src/engine.js && node --check src/ui/panel.js && node --check build.mjs"
+  }
+}

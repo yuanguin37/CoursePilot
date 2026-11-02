@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "CoursePilot 课程托管助手",
+  "version": "1.0.0",
+  "description": "多平台网课播放托管：倍速突破、自动续播、自动下一节、图形化控制面板（不答题、不伪造记录）",
+  "minimum_chrome_version": "111",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "CoursePilot：打开面板 / 在当前页启动",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.yuketang.cn/*",
+        "*://*.xuetangx.com/*",
+        "*://*.zhihuishu.com/*",
+        "*://*.icve.com.cn/*",
+        "*://*.chaoxing.com/*",
+        "*://*.xueyinonline.com/*",
+        "*://*.icourse163.org/*",
+        "*://*.smartedu.cn/*",
+        "*://*.ouchn.cn/*"
+      ],
+      "js": [
+        "coursepilot.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false,
+      "world": "MAIN"
+    }
+  ]
+}
