@@ -5,7 +5,7 @@
 ![Version](https://img.shields.io/badge/version-2.1.0-blue)
 ![Author](https://img.shields.io/badge/author-Tiwing-green)
 ![Platform](https://img.shields.io/badge/platform-Chrome%20%7C%20Edge%20%7C%20Tampermonkey-orange)
-![License](https://img.shields.io/badge/license-个人学习使用-lightgrey)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
 雨课堂、智慧树、智慧职教、学堂在线、超星学习通、中国大学 MOOC……每个平台的网课页面都长不一样，但你要做的事情是一样的：**把课看完**。CoursePilot 把这件事托管给引擎——你设定倍速，它负责播放、续播、读完图文资料、切下一节，并把每一个动作写进日志给你看。
 
@@ -299,4 +299,14 @@ CoursePilot/
 
 ## License
 
-仅供个人学习与技术研究使用。使用前请确认不违反你所在院校的课程要求与平台用户协议。
+本项目基于 [MIT License](LICENSE) 开源。
+
+```
+MIT License
+
+Copyright (c) 2026 Tiwing
+```
+
+你可以自由使用、修改、分发本项目代码，包括商业用途，唯一条件是保留原始版权声明与许可文本。
+
+注意：MIT 授权针对的是**代码本身**。使用本项目时仍应遵守你所在院校的课程要求与各网课平台的用户协议——因违规使用造成的一切后果由使用者自行承担。

@@ -2,6 +2,7 @@
   "name": "coursepilot",
   "version": "2.1.0",
   "author": "Tiwing",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "description": "CoursePilot - 多平台网课播放托管助手（图形化悬浮面板）",
