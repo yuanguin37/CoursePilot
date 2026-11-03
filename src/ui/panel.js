@@ -248,7 +248,11 @@ export function createPanel({ engine, config, logger, env }) {
     refs['delay-v'].textContent = `${delay}s`;
     refs.material.value = String(cfg.materialReadSec);
     refs['material-v'].textContent = `${cfg.materialReadSec}s`;
-    refs['nextSel-v'].textContent = cfg.nextSelector || '自动识别';
+    const rawSel = String(cfg.nextSelector || '');
+    const sep = rawSel.indexOf('|');
+    refs['nextSel-v'].textContent = rawSel
+      ? (sep > 0 ? `${rawSel.slice(sep + 1)}（${rawSel.slice(0, sep)}）` : rawSel)
+      : '自动识别';
     panel.dataset.folded = cfg.panel.folded ? 'true' : 'false';
     refs.lock.hidden = !cfg.breakthrough;
 

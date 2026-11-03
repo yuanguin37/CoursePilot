@@ -2476,9 +2476,34 @@ function attempt(fn, fallback) {
     return opened;
   }
 
+  /**
+   * 用户拾取的“下一节”选择器按域名作用域（存成 "host|selector"），
+   * 避免在 A 站挑的按钮被拿到 B 站乱点；旧格式字符串（无 | ）仍全局生效。
+   */
+  function scopedNextSelector(cfg) {
+    const raw = String(cfg.nextSelector || '');
+    const sep = raw.indexOf('|');
+    if (sep <= 0) return raw;
+    const host = String((env.location && env.location.host) || '');
+    return host && raw.slice(0, sep) === host ? raw.slice(sep + 1) : '';
+  }
+
+  /**
+   * 任务列表页守卫：一屏冒出多个“资料/附件”链接、且页面充满
+   * “未开始 / 未完成 / 未学习”标记时，这是任务列表而不是资料正文页。
+   * 这种页面不计时、不点下一节，只按目录跳未读小节。
+   */
+  function isMaterialListPage() {
+    if (materials.length < 4) return false;
+    const body = env.document.body;
+    const text = String((body && body.textContent) || '');
+    const markers = (text.match(/未开始|未完成|未学习|未读/g) || []).length;
+    return markers >= 4;
+  }
+
   /** 统一的“切下一节”入口：下一节按钮 → 未完成小节 → 目录顺序，点完都做导航校验 */
   function goNext(cfg, reason = '') {
-    const clicked = attempt(() => adapter.next({ selector: cfg.nextSelector }), null);
+    const clicked = attempt(() => adapter.next({ selector: scopedNextSelector(cfg) }), null);
     if (clicked) {
       session.switches += 1;
       resetTrack(null);
@@ -2611,7 +2636,7 @@ function attempt(fn, fallback) {
       return runReaderTick(cfg, info);
     }
 
-    if (materials.length > 0) {
+    if (materials.length > 0 && !isMaterialListPage()) {
       state.content = 'material';
       return runMaterialTick(cfg);
     }
@@ -2901,8 +2926,9 @@ function attempt(fn, fallback) {
         return;
       }
 
-      config.set({ nextSelector: selector });
-      logger.info(`已记住“下一节”按钮：${selector}，之后优先点它`);
+      const host = String((env.location && env.location.host) || '');
+      config.set({ nextSelector: host ? `${host}|${selector}` : selector });
+      logger.info(`已记住“下一节”按钮（${host}）：${selector}，本站之后优先点它`);
       setPhase('running', `已记住下一节按钮：${selector}`);
       emit();
     };
@@ -3486,7 +3512,11 @@ const TEMPLATE = `
     refs['delay-v'].textContent = `${delay}s`;
     refs.material.value = String(cfg.materialReadSec);
     refs['material-v'].textContent = `${cfg.materialReadSec}s`;
-    refs['nextSel-v'].textContent = cfg.nextSelector || '自动识别';
+    const rawSel = String(cfg.nextSelector || '');
+    const sep = rawSel.indexOf('|');
+    refs['nextSel-v'].textContent = rawSel
+      ? (sep > 0 ? `${rawSel.slice(sep + 1)}（${rawSel.slice(0, sep)}）` : rawSel)
+      : '自动识别';
     panel.dataset.folded = cfg.panel.folded ? 'true' : 'false';
     refs.lock.hidden = !cfg.breakthrough;
 
