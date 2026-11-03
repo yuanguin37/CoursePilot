@@ -47,10 +47,10 @@ const DESCRIPTION = '多平台网课播放托管：倍速突破、自动续播�
 export const HEADER = [
   '// ==UserScript==',
   `// @name         ${APP_NAME} 课程托管助手`,
-  '// @namespace    https://github.com/coursepilot',
+  `// @namespace    https://github.com/Tiwing/CoursePilot`,
   `// @version      ${VERSION}`,
   `// @description  ${DESCRIPTION}`,
-  '// @author       CoursePilot',
+  '// @author       Tiwing',
   ...MATCHES.map((pattern) => `// @match        ${pattern}`),
   '// @grant        GM_getValue',
   '// @grant        GM_setValue',
@@ -110,8 +110,9 @@ export function createManifest() {
 
   return {
     manifest_version: 3,
-    name: `${APP_NAME} 课程托管助手`,
+    name: `${APP_NAME} 课程托管助手 by Tiwing`,
     version: VERSION,
+    author: 'Tiwing',
     description: DESCRIPTION,
     minimum_chrome_version: '111',
     permissions: ['activeTab', 'scripting'],

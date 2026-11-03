@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         CoursePilot 课程托管助手
-// @namespace    https://github.com/coursepilot
-// @version      2.0.0
+// @namespace    https://github.com/Tiwing/CoursePilot
+// @version      2.1.0
 // @description  多平台网课播放托管：倍速突破、自动续播、自动下一节、图形化控制面板（不答题、不伪造记录）
-// @author       CoursePilot
+// @author       Tiwing
 // @match        *://*.yuketang.cn/*
 // @match        *://*.xuetangx.com/*
 // @match        *://*.zhihuishu.com/*
@@ -23,7 +23,7 @@
   'use strict';
 
 // ---------- src/version.js ----------
-const APP_NAME = 'CoursePilot';const VERSION = '2.0.0';const STORAGE_KEY = 'coursepilot.config.v1';
+const APP_NAME = 'CoursePilot';const VERSION = '2.1.0';const STORAGE_KEY = 'coursepilot.config.v1';
 
 // ---------- src/util.js ----------
 function isFiniteNumber(value) {
@@ -3513,7 +3513,7 @@ const TEMPLATE = `
   <header class="cp-head" data-role="head">
     <div class="cp-brand">
       <span class="cp-pulse"></span>
-      <span class="cp-title" title="${APP_NAME} v${VERSION}">${APP_NAME}</span>
+      <span class="cp-title" title="${APP_NAME} v${VERSION} by Tiwing">${APP_NAME}</span>
     </div>
     <div class="cp-head-right">
       <span class="cp-badge" data-role="badge">通用网页</span>

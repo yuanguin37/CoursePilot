@@ -9,7 +9,7 @@ const TEMPLATE = `
   <header class="cp-head" data-role="head">
     <div class="cp-brand">
       <span class="cp-pulse"></span>
-      <span class="cp-title" title="${APP_NAME} v${VERSION}">${APP_NAME}</span>
+      <span class="cp-title" title="${APP_NAME} v${VERSION} by Tiwing">${APP_NAME}</span>
     </div>
     <div class="cp-head-right">
       <span class="cp-badge" data-role="badge">通用网页</span>
