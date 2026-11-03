@@ -29,7 +29,8 @@
 - 倍速：`xt-speedbutton` 内的 `li[data-speed]`，点击后播放器写 `options.speed.value` 与 `options.isDrag`
 - 适配点：写 `data-speed` / `keyt` / `jQuery.data(li,'speed')` 后模拟 `mouseover → mousemove → click`
 - 兜底：识别不到唯一 `.xtplayer`、没有 jQuery、或写入后 `playbackRate` 未变化时，回退原生倍速
-- 切下一节：雨课堂多数页面没有“下一节”按钮，脚本会按文案找可点击的 div/span，再退回到点课程目录里的下一条
+- 切下一节：新版学习页（`/ai-workspace/lms-graph/...`）没有“下一节”按钮，目录为 `.nav-item-leaf-box`，当前小节子节点带 `is-active`，按目录顺序点下一项；旧版仍按文案找可点击元素，最后退回课程目录里的下一条
+- 点击校验：点完“下一节”后 4 秒内 URL / 标题 / 视频源都没变，会自动改用课程目录跳转（未完成小节 → 目录顺序），日志会写“改用课程目录跳转”
 - 已知变化：播放器改版后 `.xtplayer` / `xt-speedbutton` 类名可能变化，改 `profiles.js` 与 `xtplayer.js` 的选择器即可
 
 ### 学堂在线（xuetangx.com）

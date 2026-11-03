@@ -1,5 +1,6 @@
-import { clickElement } from '../dom.js';
+import { clickElement, findFirstVisible, findByText, findGenericNext } from '../dom.js';
 import { readRate } from '../media.js';
+import { NEXT_LABELS } from './base.js';
 
 const ACTIVE_CLASS = 'xt_video_player_common_active';
 const state = new WeakMap();
@@ -47,10 +48,79 @@ function tapMenu(menu, item) {
   clickElement(item);
 }
 
+/**
+ * 雨课堂新版学习页（/ai-workspace/lms-graph/...）：
+ * 没有“下一节”按钮，课程列表是 .nav-item-leaf-box，当前小节的子节点带 is-active。
+ * 返回 { boxes, activeIndex }，找不到列表或定位不到当前项时返回 null。
+ */
+function findYuketangLeafList(doc) {
+  if (!doc || typeof doc.querySelectorAll !== 'function') return null;
+
+  const boxes = Array.from(doc.querySelectorAll('.nav-item-leaf-box')).filter((box) => (
+    box && typeof box.querySelector === 'function' && !!box.querySelector('.leaf-item, [class*="leaf"]')
+  ));
+  if (boxes.length < 2) return null;
+
+  const activeIndex = boxes.findIndex((box) => {
+    const leaf = box.firstElementChild;
+    return (leaf && typeof leaf.classList.contains === 'function' && leaf.classList.contains('is-active'))
+      || !!box.querySelector('.is-active');
+  });
+
+  return { boxes, activeIndex };
+}
+
 export const xtplayerQuirk = {
   findVideo(ctx) {
     const host = findXtPlayer(ctx.env.document);
     return host ? host.video : ctx.base.findVideo();
+  },
+
+  /**
+   * 雨课堂新版学习页没有“下一节”按钮：
+   * 自定义选择器 / 平台按钮 / 文案命中照旧，都没有时先按课程目录顺序点当前项的
+   * 下一项，最后才退回 base 的“next 类名”盲猜，避免乱点一次导致双击。
+   */
+  next(ctx, options = {}) {
+    const doc = ctx.env.document;
+
+    if (options && options.selector) {
+      const custom = findFirstVisible(doc, [options.selector]);
+      if (custom) {
+        clickElement(custom);
+        return { el: custom, strategy: '自定义选择器' };
+      }
+    }
+
+    const exact = findFirstVisible(doc, ctx.profile.next || []);
+    if (exact) {
+      clickElement(exact);
+      return { el: exact, strategy: '平台选择器' };
+    }
+
+    const byText = findByText(doc, NEXT_LABELS);
+    if (byText) {
+      clickElement(byText);
+      return { el: byText, strategy: '文案匹配' };
+    }
+
+    const list = findYuketangLeafList(doc);
+    if (list && list.activeIndex >= 0 && list.activeIndex + 1 < list.boxes.length) {
+      const target = list.boxes[list.activeIndex + 1];
+      const leaf = (target && target.firstElementChild) || target;
+      if (leaf) {
+        clickElement(leaf);
+        return { el: leaf, strategy: '雨课堂目录顺序' };
+      }
+    }
+
+    const generic = findGenericNext(doc);
+    if (generic) {
+      clickElement(generic);
+      return { el: generic, strategy: 'next 类名' };
+    }
+
+    return null;
   },
 
   applyRate(ctx, video, rate, options = {}) {

@@ -1587,13 +1587,15 @@ function dedupe(candidates) {
       '.learning-space-student-chapter-nav .nav-item-list',
       '.learning-space-student .nav-item-list',
       '.nav-item-list',
+      '[class*="chapter-nav"]',
+      '[class*="nav-list"]',
       '.chapter-list',
       '.section-list',
       '.xt-video-list',
       '.lms-chapter',
     ],
     done: [],
-    notes: 'Vue 播放器：倍速需要写入 xt-speedbutton 菜单并保持 options.isDrag = true，否则会被播放器重置。',
+    notes: 'Vue 播放器：倍速写入 xt-speedbutton 菜单；新版学习页无“下一节”按钮，按 .nav-item-leaf-box 目录顺序切换。',
   },
   {
     id: 'xuetangx',
@@ -1756,10 +1758,79 @@ function tapMenu(menu, item) {
     }
   }
   clickElement(item);
+}
+
+/**
+ * 雨课堂新版学习页（/ai-workspace/lms-graph/...）：
+ * 没有“下一节”按钮，课程列表是 .nav-item-leaf-box，当前小节的子节点带 is-active。
+ * 返回 { boxes, activeIndex }，找不到列表或定位不到当前项时返回 null。
+ */
+function findYuketangLeafList(doc) {
+  if (!doc || typeof doc.querySelectorAll !== 'function') return null;
+
+  const boxes = Array.from(doc.querySelectorAll('.nav-item-leaf-box')).filter((box) => (
+    box && typeof box.querySelector === 'function' && !!box.querySelector('.leaf-item, [class*="leaf"]')
+  ));
+  if (boxes.length < 2) return null;
+
+  const activeIndex = boxes.findIndex((box) => {
+    const leaf = box.firstElementChild;
+    return (leaf && typeof leaf.classList.contains === 'function' && leaf.classList.contains('is-active'))
+      || !!box.querySelector('.is-active');
+  });
+
+  return { boxes, activeIndex };
 }const xtplayerQuirk = {
   findVideo(ctx) {
     const host = findXtPlayer(ctx.env.document);
     return host ? host.video : ctx.base.findVideo();
+  },
+
+  /**
+   * 雨课堂新版学习页没有“下一节”按钮：
+   * 自定义选择器 / 平台按钮 / 文案命中照旧，都没有时先按课程目录顺序点当前项的
+   * 下一项，最后才退回 base 的“next 类名”盲猜，避免乱点一次导致双击。
+   */
+  next(ctx, options = {}) {
+    const doc = ctx.env.document;
+
+    if (options && options.selector) {
+      const custom = findFirstVisible(doc, [options.selector]);
+      if (custom) {
+        clickElement(custom);
+        return { el: custom, strategy: '自定义选择器' };
+      }
+    }
+
+    const exact = findFirstVisible(doc, ctx.profile.next || []);
+    if (exact) {
+      clickElement(exact);
+      return { el: exact, strategy: '平台选择器' };
+    }
+
+    const byText = findByText(doc, NEXT_LABELS);
+    if (byText) {
+      clickElement(byText);
+      return { el: byText, strategy: '文案匹配' };
+    }
+
+    const list = findYuketangLeafList(doc);
+    if (list && list.activeIndex >= 0 && list.activeIndex + 1 < list.boxes.length) {
+      const target = list.boxes[list.activeIndex + 1];
+      const leaf = (target && target.firstElementChild) || target;
+      if (leaf) {
+        clickElement(leaf);
+        return { el: leaf, strategy: '雨课堂目录顺序' };
+      }
+    }
+
+    const generic = findGenericNext(doc);
+    if (generic) {
+      clickElement(generic);
+      return { el: generic, strategy: 'next 类名' };
+    }
+
+    return null;
   },
 
   applyRate(ctx, video, rate, options = {}) {
@@ -1943,6 +2014,7 @@ function attempt(fn, fallback) {
   let lastPdfLogAt = 0;
   let pickingNext = false;
   let pendingJump = null;
+  let pendingNext = null;
   let pdfReadSec = 0;
   let pdfLastAt = 0;
   let pdfDone = false;
@@ -2097,6 +2169,52 @@ function attempt(fn, fallback) {
     }
   }
 
+  /** 当前播放源地址，用于判断“下一节”点击后页面是否真的换了内容 */
+  function currentVideoSrc() {
+    if (!video) return '';
+    return String((video.currentSrc || video.src) || '');
+  }
+
+  /**
+   * “下一节”点击后的校验：SPA（雨课堂新版学习页）点了没反应时不再干等，
+   * 4 秒内 URL / 标题 / 视频源都没变就降级为课程目录跳转。
+   */
+  function checkPendingNext(cfg) {
+    if (!pendingNext) return;
+
+    const hrefChanged = String(env.location.href || '') !== pendingNext.href;
+    const titleChanged = String(env.document.title || '') !== pendingNext.title;
+    const srcChanged = currentVideoSrc() !== pendingNext.src;
+    if (hrefChanged || titleChanged || srcChanged) {
+      pendingNext = null;
+      return;
+    }
+    if (now() - pendingNext.at < 4000) return;
+
+    const strategy = pendingNext.strategy || '按钮';
+    pendingNext = null;
+    logger.warn(`点击“下一节”（${strategy}）后页面没有变化，改用课程目录跳转`);
+
+    if (cfg.autoJump && jumpToNextUnfinished(cfg, '下一节按钮无效')) return;
+
+    const ordered = attempt(() => outline.nextInOrder(adapter.profile || {}), null);
+    if (ordered && attempt(() => outline.open(ordered), false)) {
+      session.switches += 1;
+      resetTrack(null);
+      docTrack = { target: null, lastAt: now(), done: false, nextAt: 0 };
+      setPhase('searching', `正在跳到下一节：${ordered.title}`);
+      logger.info(`按目录顺序跳到下一节：${ordered.title}`);
+      return;
+    }
+
+    if (isCourseDone(cfg)) {
+      setPhase('done', '本课程已完成');
+      logger.info('课程已全部完成，不再切换');
+    } else {
+      setPhase('finished', '“下一节”点了没反应，请手动切换或点面板「诊断」');
+    }
+  }
+
   function tick() {
     const cfg = config.get();
     state.target = cfg.speed;
@@ -2130,6 +2248,7 @@ function attempt(fn, fallback) {
       pdfDone = false;
       pdfNextAt = 0;
       pendingJump = null;
+      pendingNext = null;
       logger.info(`平台适配：${adapter.name}`);
     }
 
@@ -2141,6 +2260,7 @@ function attempt(fn, fallback) {
     }
 
     checkPendingJump();
+    checkPendingNext(cfg);
 
     // 目录状态每 3 秒刷新一次，面板在任何内容类型下都能显示“下一节未完成”
     refreshOutline(cfg);
@@ -2275,14 +2395,8 @@ function attempt(fn, fallback) {
       setPhase('finished', `本节已完成（${formatPercent(ratio)}%）`);
     } else if (track && track.done && cfg.autoNext && track.nextAt && now() >= track.nextAt) {
       track.nextAt = 0;
-      const clicked = attempt(() => adapter.next({ selector: cfg.nextSelector }), null);
-      if (clicked) {
-        session.switches += 1;
-        logger.info('已切换到下一节');
-        resetTrack(null);
-        setPhase('searching', '正在加载下一节…');
-      } else if (cfg.autoJump && jumpToNextUnfinished(cfg, '无下一节按钮')) {
-        resetTrack(null);
+      if (goNext(cfg, '无下一节按钮')) {
+        /* 已发起切换，checkPendingNext 会校验是否真的切过去了 */
       } else if (isCourseDone(cfg)) {
         setPhase('done', '本课程已完成');
         logger.info('课程已全部完成，不再切换');
@@ -2362,6 +2476,43 @@ function attempt(fn, fallback) {
     return opened;
   }
 
+  /** 统一的“切下一节”入口：下一节按钮 → 未完成小节 → 目录顺序，点完都做导航校验 */
+  function goNext(cfg, reason = '') {
+    const clicked = attempt(() => adapter.next({ selector: cfg.nextSelector }), null);
+    if (clicked) {
+      session.switches += 1;
+      resetTrack(null);
+      docTrack = { target: null, lastAt: now(), done: false, nextAt: 0 };
+      setPhase('searching', '正在加载下一节…');
+      pendingNext = {
+        at: now(),
+        href: String(env.location.href || ''),
+        title: String(env.document.title || ''),
+        src: currentVideoSrc(),
+        strategy: (clicked && clicked.strategy) || '按钮',
+      };
+      logger.info(`已点击“下一节”（${pendingNext.strategy}），等待页面响应`);
+      return true;
+    }
+
+    if (cfg.autoJump && jumpToNextUnfinished(cfg, reason)) {
+      resetTrack(null);
+      return true;
+    }
+
+    const ordered = attempt(() => outline.nextInOrder(adapter.profile || {}), null);
+    if (ordered && attempt(() => outline.open(ordered), false)) {
+      session.switches += 1;
+      resetTrack(null);
+      docTrack = { target: null, lastAt: now(), done: false, nextAt: 0 };
+      setPhase('searching', `正在跳到下一节：${ordered.title}`);
+      logger.info(`按目录顺序跳到下一节：${ordered.title}（点击 ${ordered.clickTag || 'element'}）`);
+      return true;
+    }
+
+    return false;
+  }
+
   /** 内容自动识别：视频优先，其次图文，最后资料页 */
   function tickDocument(cfg) {
     state.mode = 'document';
@@ -2430,13 +2581,8 @@ function attempt(fn, fallback) {
 
       if (cfg.autoNext && pdfNextAt && now() >= pdfNextAt) {
         pdfNextAt = 0;
-        const result = attempt(() => adapter.next({ selector: cfg.nextSelector }), null);
-        if (result) {
-          session.switches += 1;
+        if (goNext(cfg, 'PDF 之后')) {
           setPhase('reading', '正在加载下一节…');
-          logger.info('已切换到下一节');
-        } else if (jumpToNextUnfinished(cfg, 'PDF 之后')) {
-          /* 已跳转 */
         } else if (isCourseDone(cfg)) {
           setPhase('done', '本课程已完成');
           logger.info('课程已全部完成，不再切换');
@@ -2524,14 +2670,8 @@ function attempt(fn, fallback) {
 
       if (cfg.autoNext && docTrack.nextAt && now() >= docTrack.nextAt) {
         docTrack.nextAt = 0;
-        const clicked = attempt(() => adapter.next({ selector: cfg.nextSelector }), null);
-        if (clicked) {
-          session.switches += 1;
-          docTrack = { target: null, lastAt: now(), done: false, nextAt: 0 };
+        if (goNext(cfg, '无下一节按钮')) {
           setPhase('reading', '正在加载下一节…');
-          logger.info('已切换到下一节');
-        } else if (cfg.autoJump && jumpToNextUnfinished(cfg, '无下一节按钮')) {
-          docTrack = { target: null, lastAt: now(), done: false, nextAt: 0 };
         } else if (isCourseDone(cfg)) {
           setPhase('done', '本课程已完成');
           logger.info('课程已全部完成，不再切换');
@@ -2592,13 +2732,8 @@ function attempt(fn, fallback) {
 
     if (cfg.autoNext && materialNextAt && now() >= materialNextAt) {
       materialNextAt = 0;
-      const clicked = attempt(() => adapter.next({ selector: cfg.nextSelector }), null);
-      if (clicked) {
-        session.switches += 1;
+      if (goNext(cfg, '无下一节按钮')) {
         setPhase('reading', '正在加载下一节…');
-        logger.info('已切换到下一节');
-      } else if (cfg.autoJump && jumpToNextUnfinished(cfg, '无下一节按钮')) {
-        /* 已跳转 */
       } else if (isCourseDone(cfg)) {
         setPhase('done', '本课程已完成');
         logger.info('课程已全部完成，不再切换');
@@ -2724,29 +2859,10 @@ function attempt(fn, fallback) {
   function skip() {
     if (!adapter) return getState();
 
-    const result = attempt(() => adapter.next({ selector: config.get().nextSelector }), null);
-    if (result) {
-      session.switches += 1;
-      resetTrack(null);
-      docTrack = { target: null, lastAt: now(), done: false, nextAt: 0 };
-      setPhase('searching', '正在加载下一节…');
-      logger.info(`手动切换到下一节（${(result && result.strategy) || '按钮'}）`);
+    if (goNext(config.get(), '手动下一节')) {
+      logger.info('手动切换到下一节，若页面无变化会自动换目录入口重试');
       return emit();
     }
-
-    // 没有“下一节”按钮时，先按目录顺序取下一项
-    const ordered = attempt(() => outline.nextInOrder(adapter.profile || {}), null);
-    if (ordered && attempt(() => outline.open(ordered), false)) {
-      session.switches += 1;
-      resetTrack(null);
-      docTrack = { target: null, lastAt: now(), done: false, nextAt: 0 };
-      setPhase('searching', '正在加载下一节…');
-      logger.info(`手动切换到下一节（目录顺序：${ordered.title} · 点击 ${ordered.clickTag || 'element'}）`);
-      return emit();
-    }
-
-    // 再退回“第一个未完成小节”
-    if (attempt(() => jumpToNextUnfinished(config.get(), '手动下一节'), false)) return emit();
 
     const candidates = attempt(() => adapter.inspectNext(), []) || [];
     logger.warn('未找到“下一节”入口，页面上的候选按钮：');
