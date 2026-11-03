@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CoursePilot 课程托管助手
 // @namespace    https://github.com/coursepilot
-// @version      1.5.0
+// @version      1.6.0
 // @description  多平台网课播放托管：倍速突破、自动续播、自动下一节、图形化控制面板（不答题、不伪造记录）
 // @author       CoursePilot
 // @match        *://*.yuketang.cn/*
@@ -23,7 +23,7 @@
   'use strict';
 
 // ---------- src/version.js ----------
-const APP_NAME = 'CoursePilot';const VERSION = '1.5.0';const STORAGE_KEY = 'coursepilot.config.v1';
+const APP_NAME = 'CoursePilot';const VERSION = '1.6.0';const STORAGE_KEY = 'coursepilot.config.v1';
 
 // ---------- src/util.js ----------
 function isFiniteNumber(value) {
@@ -1581,7 +1581,7 @@ function dedupe(candidates) {
     name: '雨课堂',
     quirk: 'xtplayer',
     hosts: ['yuketang.cn'],
-    listPages: ['/ci/web/index', '/web/list', '/web/myCourses', '#tab/unfinished'],
+    listPages: ['/ci/web/index', '/web/list', '/web/myCourses', '/web/studentLog', '#tab/unfinished'],
     obstacle: ['.xt-popup', '.xt-exam-layer', '.question-wrap', '[class*="question-dialog"]'],
     next: ['.xt-next-btn', '[class*="next-video"]'],
     reader: ['.rich-text', '.markdown-body', '.lms-detail', '.xt-content'],

@@ -13,7 +13,7 @@ export const PLATFORM_PROFILES = [
     name: '雨课堂',
     quirk: 'xtplayer',
     hosts: ['yuketang.cn'],
-    listPages: ['/ci/web/index', '/web/list', '/web/myCourses', '#tab/unfinished'],
+    listPages: ['/ci/web/index', '/web/list', '/web/myCourses', '/web/studentLog', '#tab/unfinished'],
     obstacle: ['.xt-popup', '.xt-exam-layer', '.question-wrap', '[class*="question-dialog"]'],
     next: ['.xt-next-btn', '[class*="next-video"]'],
     reader: ['.rich-text', '.markdown-body', '.lms-detail', '.xt-content'],
