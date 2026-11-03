@@ -203,7 +203,10 @@ export function createEngine({ config, logger, env }) {
 
       // 1) 目录项自带真实 href → 直接导航
       const rawHref = item && item.href;
-      const href = rawHref && !/^javascript:/i.test(rawHref) && !rawHref.startsWith('#') ? rawHref : '';
+      // 只对看起来是课时内容的链接兜底直达（防把首页/列表链接当课时跳过去）
+      const href = rawHref && !/^javascript:/i.test(rawHref) && !rawHref.startsWith('#')
+        && /(ai-workspace|\/video|\/study|lesson_id|content_id|node_id|\/lms|\/learning)/i.test(rawHref)
+        ? rawHref : '';
       if (href && canAssign) {
         try {
           win.location.assign(new URL(href, currentHref).href);
@@ -746,13 +749,9 @@ export function createEngine({ config, logger, env }) {
       state.content = 'unknown';
       state.document = null;
 
-      const outlineState = refreshOutline(cfg);
-      if (outlineState && outlineState.total > 0 && !outlineState.next) {
-        setPhase('done', '本课程已完成');
-        return emit();
-      }
-      if (cfg.autoJump && jumpToNextUnfinished(cfg, '平台列表页')) return emit();
-      if (listRowJump(cfg, '列表页任务')) return emit();
+      // 列表页没有真实课程目录，绝不跑目录扫描（会扫到 tab 栏等垃圾并误点
+      // 把页面带走），只直接点列表条目（先展开模块，再点未开始/角标行）
+      if (cfg.autoJump && listRowJump(cfg, '列表页任务')) return emit();
       setPhase('searching', '列表页 · 请进入具体课程/小节后再托管');
       return emit();
     }
