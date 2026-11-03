@@ -4,6 +4,8 @@
  * reader: 图文/文档页的阅读容器选择器（命中即可自动滚动）。
  * download: 课件/附件入口选择器，找不到时按文件后缀兜底。
  * outline: 课程目录容器，用于定位“下一个未完成小节”。
+ * listPages: 门户/列表页的 URL 路径片段——这些页面绝不按内容页托管
+ *            （防止课程卡片/任务条目被误判成资料后触发“下一节”跳走）。
  */
 export const PLATFORM_PROFILES = [
   {
@@ -11,6 +13,7 @@ export const PLATFORM_PROFILES = [
     name: '雨课堂',
     quirk: 'xtplayer',
     hosts: ['yuketang.cn'],
+    listPages: ['/ci/web/index', '/web/list', '/web/myCourses'],
     obstacle: ['.xt-popup', '.xt-exam-layer', '.question-wrap', '[class*="question-dialog"]'],
     next: ['.xt-next-btn', '[class*="next-video"]'],
     reader: ['.rich-text', '.markdown-body', '.lms-detail', '.xt-content'],
@@ -127,6 +130,7 @@ export const GENERIC_PROFILE = {
   name: '通用网页',
   quirk: 'native',
   hosts: [],
+  listPages: [],
   obstacle: ['[class*="question-dialog"]', '.question-wrap', '.popup-quiz'],
   next: [],
   reader: ['article', '.article-content', '.rich-text', '.markdown-body', '.doc-content', '#js_content'],

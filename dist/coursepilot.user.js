@@ -1573,12 +1573,15 @@ function dedupe(candidates) {
  * reader: 图文/文档页的阅读容器选择器（命中即可自动滚动）。
  * download: 课件/附件入口选择器，找不到时按文件后缀兜底。
  * outline: 课程目录容器，用于定位“下一个未完成小节”。
+ * listPages: 门户/列表页的 URL 路径片段——这些页面绝不按内容页托管
+ *            （防止课程卡片/任务条目被误判成资料后触发“下一节”跳走）。
  */const PLATFORM_PROFILES = [
   {
     id: 'yuketang',
     name: '雨课堂',
     quirk: 'xtplayer',
     hosts: ['yuketang.cn'],
+    listPages: ['/ci/web/index', '/web/list', '/web/myCourses'],
     obstacle: ['.xt-popup', '.xt-exam-layer', '.question-wrap', '[class*="question-dialog"]'],
     next: ['.xt-next-btn', '[class*="next-video"]'],
     reader: ['.rich-text', '.markdown-body', '.lms-detail', '.xt-content'],
@@ -1693,6 +1696,7 @@ function dedupe(candidates) {
   name: '通用网页',
   quirk: 'native',
   hosts: [],
+  listPages: [],
   obstacle: ['[class*="question-dialog"]', '.question-wrap', '.popup-quiz'],
   next: [],
   reader: ['article', '.article-content', '.rich-text', '.markdown-body', '.doc-content', '#js_content'],
@@ -1934,6 +1938,16 @@ const QUIRK_TABLE = {
   for (const key of Object.keys(quirk)) {
     adapter[key] = (...args) => quirk[key]({ base, env, profile }, ...args);
   }
+
+  /** 平台声明的门户/列表页：这类 URL 不参与内容托管，引擎只做目录跳转 */
+  adapter.isListPage = () => {
+    try {
+      const path = String(env.location.pathname || '');
+      return (profile.listPages || []).some((pattern) => !!pattern && path.includes(pattern));
+    } catch {
+      return false;
+    }
+  };
 
   return adapter;
 }
@@ -2542,6 +2556,25 @@ function attempt(fn, fallback) {
   function tickDocument(cfg) {
     state.mode = 'document';
 
+    // 平台声明的门户/列表页：绝不按内容页托管（课程卡片 / 任务条目会被
+    // 误判成资料，计时结束后点“下一节”把页面带走），只保留目录跳转
+    if (attempt(() => adapter.isListPage(), false)) {
+      materials = [];
+      materialSignature = '';
+      state.materials = { count: 0, downloaded: clickedMaterials.size, readSec: 0, goal: cfg.materialReadSec };
+      state.content = 'unknown';
+      state.document = null;
+
+      const outlineState = refreshOutline(cfg);
+      if (outlineState && outlineState.total > 0 && !outlineState.next) {
+        setPhase('done', '本课程已完成');
+        return emit();
+      }
+      if (cfg.autoJump && jumpToNextUnfinished(cfg, '平台列表页')) return emit();
+      setPhase('searching', '列表页 · 请进入具体课程/小节后再托管');
+      return emit();
+    }
+
     if (now() - lastMaterialScanAt > 2000) {
       lastMaterialScanAt = now();
       const profile = adapter && adapter.profile ? adapter.profile : {};
@@ -2831,6 +2864,13 @@ function attempt(fn, fallback) {
         detail: item.detail,
       })),
       nextCandidates,
+      // 资料候选明细：用来诊断“列表页为什么被当成资料页”
+      materials: materials.slice(0, 10).map((item) => ({
+        label: item.label,
+        preview: !!item.preview,
+        href: attempt(() => String((item.el.getAttribute && item.el.getAttribute('href')) || '').slice(0, 120), ''),
+        className: attempt(() => String(item.el.className || '').slice(0, 80), ''),
+      })),
     };
 
     logger.info('结构探针输出如下，可复制整段 JSON 反馈');

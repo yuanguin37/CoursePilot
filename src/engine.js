@@ -608,6 +608,25 @@ export function createEngine({ config, logger, env }) {
   function tickDocument(cfg) {
     state.mode = 'document';
 
+    // 平台声明的门户/列表页：绝不按内容页托管（课程卡片 / 任务条目会被
+    // 误判成资料，计时结束后点“下一节”把页面带走），只保留目录跳转
+    if (attempt(() => adapter.isListPage(), false)) {
+      materials = [];
+      materialSignature = '';
+      state.materials = { count: 0, downloaded: clickedMaterials.size, readSec: 0, goal: cfg.materialReadSec };
+      state.content = 'unknown';
+      state.document = null;
+
+      const outlineState = refreshOutline(cfg);
+      if (outlineState && outlineState.total > 0 && !outlineState.next) {
+        setPhase('done', '本课程已完成');
+        return emit();
+      }
+      if (cfg.autoJump && jumpToNextUnfinished(cfg, '平台列表页')) return emit();
+      setPhase('searching', '列表页 · 请进入具体课程/小节后再托管');
+      return emit();
+    }
+
     if (now() - lastMaterialScanAt > 2000) {
       lastMaterialScanAt = now();
       const profile = adapter && adapter.profile ? adapter.profile : {};
@@ -897,6 +916,13 @@ export function createEngine({ config, logger, env }) {
         detail: item.detail,
       })),
       nextCandidates,
+      // 资料候选明细：用来诊断“列表页为什么被当成资料页”
+      materials: materials.slice(0, 10).map((item) => ({
+        label: item.label,
+        preview: !!item.preview,
+        href: attempt(() => String((item.el.getAttribute && item.el.getAttribute('href')) || '').slice(0, 120), ''),
+        className: attempt(() => String(item.el.className || '').slice(0, 80), ''),
+      })),
     };
 
     logger.info('结构探针输出如下，可复制整段 JSON 反馈');

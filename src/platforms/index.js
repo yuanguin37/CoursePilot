@@ -21,5 +21,15 @@ export function createAdapter(href, env) {
     adapter[key] = (...args) => quirk[key]({ base, env, profile }, ...args);
   }
 
+  /** 平台声明的门户/列表页：这类 URL 不参与内容托管，引擎只做目录跳转 */
+  adapter.isListPage = () => {
+    try {
+      const path = String(env.location.pathname || '');
+      return (profile.listPages || []).some((pattern) => !!pattern && path.includes(pattern));
+    } catch {
+      return false;
+    }
+  };
+
   return adapter;
 }
