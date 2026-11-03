@@ -615,6 +615,7 @@ export function createEngine({ config, logger, env }) {
   }
 
   let lastListRowAt = 0;
+  let lastExpandAt = 0;
   const listRowFails = new Map();
 
   /** 元素自身的直接文本（不含子元素） */
@@ -670,6 +671,22 @@ export function createEngine({ config, logger, env }) {
     const doc = env.document;
     if (!doc || typeof doc.querySelectorAll !== 'function') return false;
 
+    // 折叠的模块先展开（开关文字是“展开”）：展开后下一轮再点里面的条目
+    if (now() - lastExpandAt > 8000) {
+      for (const el of doc.querySelectorAll('body *')) {
+        const own = ownText(el);
+        if (!/^(展开|点击展开|展开模块)$/.test(own)) continue;
+        if (!attempt(() => !!(el.offsetParent || (el.getClientRects && el.getClientRects().length)), false)) continue;
+        if (markerInNav(el)) continue;
+        if (el.closest && el.closest('#coursepilot-host')) continue;
+        lastExpandAt = now();
+        attempt(() => clickElement(el), false);
+        setPhase('searching', '正在展开课程模块…');
+        logger.info(`展开课程模块：${String((el.parentElement && el.parentElement.textContent) || own).replace(/\s+/g, ' ').trim().slice(0, 40)}`);
+        return true;
+      }
+    }
+
     const passes = [
       /^(未开始|未读|未完成|未学习)$/,
       /^(视频|图文|文档|课件|资料)$/,
@@ -678,12 +695,16 @@ export function createEngine({ config, logger, env }) {
     for (const pattern of passes) {
       for (const marker of doc.querySelectorAll('body *')) {
         if (!pattern.test(ownText(marker))) continue;
+        // 隐藏元素（折叠模块里的条目）点不动，跳过
+        if (!attempt(() => !!(marker.offsetParent || (marker.getClientRects && marker.getClientRects().length)), false)) continue;
         if (markerInNav(marker)) continue;
 
         const row = findListRow(marker, doc);
         if (!row) continue;
 
         const title = attempt(() => String(row.el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60), '列表条目');
+        // 作业/考试等考核类条目没法自动完成，跳过
+        if (/^作业|^考试|^测验|^问卷|^投票|考核截止时间/.test(title)) continue;
         const key = attempt(() => (row.link ? String(row.link.getAttribute('href') || '') : '') || title, title) || title;
         const failedAt = listRowFails.get(key);
         if (failedAt && now() - failedAt < 60000) continue;
