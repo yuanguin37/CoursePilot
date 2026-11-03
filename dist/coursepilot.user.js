@@ -2995,6 +2995,7 @@ function attempt(fn, fallback) {
     const profile = adapter && adapter.profile ? adapter.profile : {};
     const snapshot = getState();
     const data = {
+      version: VERSION,
       url: String(env.location.href || ''),
       title: String(env.document.title || ''),
       platform: snapshot.platform,
@@ -3002,6 +3003,13 @@ function attempt(fn, fallback) {
       phase: snapshot.phase,
       outline: attempt(() => outline.inspect(profile), []) || [],
       nextCandidates: adapter ? attempt(() => adapter.inspectNext(), []) || [] : [],
+      // 资料候选明细：诊断“列表页为什么被当成资料页”
+      materials: materials.slice(0, 10).map((item) => ({
+        label: item.label,
+        preview: !!item.preview,
+        href: attempt(() => String((item.el.getAttribute && item.el.getAttribute('href')) || '').slice(0, 120), ''),
+        className: attempt(() => String(item.el.className || '').slice(0, 80), ''),
+      })),
     };
 
     logger.info(`诊断：${data.platform.name} / ${data.content} / ${data.phase} / 目录候选 ${data.outline.length} 个 / 按钮候选 ${data.nextCandidates.length} 个`);
