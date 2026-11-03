@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CoursePilot 课程托管助手
 // @namespace    https://github.com/coursepilot
-// @version      1.4.0
+// @version      1.5.0
 // @description  多平台网课播放托管：倍速突破、自动续播、自动下一节、图形化控制面板（不答题、不伪造记录）
 // @author       CoursePilot
 // @match        *://*.yuketang.cn/*
@@ -23,7 +23,7 @@
   'use strict';
 
 // ---------- src/version.js ----------
-const APP_NAME = 'CoursePilot';const VERSION = '1.4.0';const STORAGE_KEY = 'coursepilot.config.v1';
+const APP_NAME = 'CoursePilot';const VERSION = '1.5.0';const STORAGE_KEY = 'coursepilot.config.v1';
 
 // ---------- src/util.js ----------
 function isFiniteNumber(value) {
@@ -2566,9 +2566,51 @@ function attempt(fn, fallback) {
   let lastListRowAt = 0;
   const listRowFails = new Map();
 
+  /** 元素自身的直接文本（不含子元素） */
+  function ownText(el) {
+    return attempt(() => Array.from(el.childNodes)
+      .filter((n) => n.nodeType === 3)
+      .map((n) => String(n.nodeValue || '').trim())
+      .join(''), '');
+  }
+
+  /** 标记是否位于导航/筛选控件里（比如“未完成”筛选 tab） */
+  function markerInNav(marker) {
+    return attempt(() => {
+      let p = marker.parentElement;
+      for (let i = 0; i < 3 && p; i++) {
+        if (/tab|nav|menu|filter|header|switch/i.test(String(p.className || ''))) return true;
+        p = p.parentElement;
+      }
+      return false;
+    }, true);
+  }
+
+  /** 从标记向上找可点击的任务行容器：文本量可控，且带链接或可点击语义 */
+  function findListRow(marker, doc) {
+    return attempt(() => {
+      let p = marker;
+      for (let i = 0; i < 6 && p && p !== doc.body; i++) {
+        p = p.parentElement;
+        if (!p || (p.closest && p.closest('#coursepilot-host'))) return null;
+        if (String(p.textContent || '').length > 300) return null;
+        const link = p.querySelector ? p.querySelector('a[href]') : null;
+        const cls = String(p.className || '');
+        const clickable = link
+          || /item|row|task|lesson|card|exercise/i.test(cls)
+          || (p.getAttribute && (p.getAttribute('onclick') || p.getAttribute('role') === 'button'));
+        if (clickable) return { el: p, link };
+      }
+      return null;
+    }, null);
+  }
+
   /**
-   * 任务列表页兜底：页面没有章节目录、但有“未开始 / 未读”任务行时，
-   * 直接点进第一个未完成任务（雨课堂“未完成”列表页就是这个形态）。
+   * 任务/日志列表页兜底：页面没有章节目录时，直接点进列表条目。
+   * 两轮扫描：
+   *  1) “未开始 / 未读”状态标记 → 未完成任务行（雨课堂“未完成”页）
+   *  2) “视频 / 图文 / 文档”内容角标 → 学习日志条目（雨课堂“学习日志”页，
+   *     没有状态标记，只有内容类型角标；点进去后由引擎按目录推进未完成项）
    * 点完交给 checkPendingJump 校验，没跳成再试链接直达。
    */
   function listRowJump(cfg, reason = '') {
@@ -2577,66 +2619,44 @@ function attempt(fn, fallback) {
     const doc = env.document;
     if (!doc || typeof doc.querySelectorAll !== 'function') return false;
 
-    for (const marker of doc.querySelectorAll('body *')) {
-      const own = attempt(() => Array.from(marker.childNodes)
-        .filter((n) => n.nodeType === 3)
-        .map((n) => String(n.nodeValue || '').trim())
-        .join(''), '');
-      if (!/^(未开始|未读|未完成|未学习)$/.test(own)) continue;
+    const passes = [
+      /^(未开始|未读|未完成|未学习)$/,
+      /^(视频|图文|文档|课件|资料)$/,
+    ];
 
-      // 跳过导航/筛选控件（比如“未完成”筛选 tab）
-      const inNav = attempt(() => {
-        let p = marker.parentElement;
-        for (let i = 0; i < 3 && p; i++) {
-          if (/tab|nav|menu|filter|header|switch/i.test(String(p.className || ''))) return true;
-          p = p.parentElement;
+    for (const pattern of passes) {
+      for (const marker of doc.querySelectorAll('body *')) {
+        if (!pattern.test(ownText(marker))) continue;
+        if (markerInNav(marker)) continue;
+
+        const row = findListRow(marker, doc);
+        if (!row) continue;
+
+        const title = attempt(() => String(row.el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60), '列表条目');
+        const key = attempt(() => (row.link ? String(row.link.getAttribute('href') || '') : '') || title, title) || title;
+        const failedAt = listRowFails.get(key);
+        if (failedAt && now() - failedAt < 60000) continue;
+
+        lastListRowAt = now();
+        const clicked = attempt(() => clickElement(row.link || row.el), false);
+        if (!clicked) {
+          listRowFails.set(key, now());
+          continue;
         }
-        return false;
-      }, true);
-      if (inNav) continue;
 
-      // 从标记向上找行容器：文本量可控，且带链接或可点击语义
-      const row = attempt(() => {
-        let p = marker;
-        for (let i = 0; i < 6 && p && p !== doc.body; i++) {
-          p = p.parentElement;
-          if (!p || (p.closest && p.closest('#coursepilot-host'))) return null;
-          if (String(p.textContent || '').length > 300) return null;
-          const link = p.querySelector ? p.querySelector('a[href]') : null;
-          const cls = String(p.className || '');
-          const clickable = link
-            || /item|row|task|lesson|card|exercise/i.test(cls)
-            || (p.getAttribute && (p.getAttribute('onclick') || p.getAttribute('role') === 'button'));
-          if (clickable) return { el: p, link };
-        }
-        return null;
-      }, null);
-      if (!row) continue;
-
-      const title = attempt(() => String(row.el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60), '未完成任务');
-      const key = attempt(() => (row.link ? String(row.link.getAttribute('href') || '') : '') || title, title) || title;
-      const failedAt = listRowFails.get(key);
-      if (failedAt && now() - failedAt < 60000) continue;
-
-      lastListRowAt = now();
-      const clicked = attempt(() => clickElement(row.link || row.el), false);
-      if (!clicked) {
-        listRowFails.set(key, now());
-        continue;
+        session.switches += 1;
+        resetTrack(null);
+        docTrack = { target: null, lastAt: now(), done: false, nextAt: 0 };
+        setPhase('searching', `正在进入任务：${title}`);
+        logger.info(`点进列表条目：${title}${reason ? `（${reason}）` : ''}`);
+        pendingJump = {
+          item: { title, href: attempt(() => (row.link ? String(row.link.getAttribute('href') || '') : ''), '') },
+          href: String(env.location.href || ''),
+          title: String(env.document.title || ''),
+          at: now(),
+        };
+        return true;
       }
-
-      session.switches += 1;
-      resetTrack(null);
-      docTrack = { target: null, lastAt: now(), done: false, nextAt: 0 };
-      setPhase('searching', `正在进入任务：${title}`);
-      logger.info(`点进未完成任务行：${title}${reason ? `（${reason}）` : ''}`);
-      pendingJump = {
-        item: { title, href: attempt(() => (row.link ? String(row.link.getAttribute('href') || '') : ''), '') },
-        href: String(env.location.href || ''),
-        title: String(env.document.title || ''),
-        at: now(),
-      };
-      return true;
     }
     return false;
   }
