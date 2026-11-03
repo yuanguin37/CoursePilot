@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CoursePilot 课程托管助手",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "多平台网课播放托管：倍速突破、自动续播、自动下一节、图形化控制面板（不答题、不伪造记录）",
   "minimum_chrome_version": "111",
   "permissions": [

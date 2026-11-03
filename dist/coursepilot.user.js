@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CoursePilot 课程托管助手
 // @namespace    https://github.com/coursepilot
-// @version      1.8.0
+// @version      1.9.0
 // @description  多平台网课播放托管：倍速突破、自动续播、自动下一节、图形化控制面板（不答题、不伪造记录）
 // @author       CoursePilot
 // @match        *://*.yuketang.cn/*
@@ -23,7 +23,7 @@
   'use strict';
 
 // ---------- src/version.js ----------
-const APP_NAME = 'CoursePilot';const VERSION = '1.8.0';const STORAGE_KEY = 'coursepilot.config.v1';
+const APP_NAME = 'CoursePilot';const VERSION = '1.9.0';const STORAGE_KEY = 'coursepilot.config.v1';
 
 // ---------- src/util.js ----------
 function isFiniteNumber(value) {
@@ -2138,10 +2138,37 @@ function attempt(fn, fallback) {
     const currentHref = String(env.location.href || '');
     const currentTitle = String(env.document.title || '');
     if (currentHref !== pendingJump.href || currentTitle !== pendingJump.title) {
+      // 引擎点击导致页面变化：若落在列表/首页，判定为误点，自动跳回点击前的页面。
+      // “只有用户自己才能离开课程”的硬边界。
+      const landedBad = attempt(() => {
+        const url = new URL(currentHref);
+        return attempt(() => adapter.isListPage(), false)
+          || /^\/(index\/?)?$/i.test(url.pathname)
+          || /(\/ci\/web\/index|\/web\/list|\/web\/myCourses|\/web\/studentLog|\/home\b)/i.test(url.pathname);
+      }, false);
+      const backHref = pendingJump.href;
+      const fresh = now() - pendingJump.at < 8000;
       pendingJump = null;
+      if (landedBad && fresh && backHref) {
+        const win = env.window;
+        if (win && win.location && typeof win.location.assign === 'function') {
+          logger.warn('检测到自动操作把页面带回列表/首页，正在回退…');
+          try {
+            win.location.assign(backHref);
+            setPhase('searching', '已自动回退，请稍候…');
+          } catch {
+            /* 忽略 */
+          }
+        }
+      }
       return;
     }
     if (now() - pendingJump.at < 2500) return;
+    // 展开模块这类“无导航预期”的点击只做回退哨兵，不做直达补试
+    if (pendingJump.soft) {
+      pendingJump = null;
+      return;
+    }
 
     if (!pendingJump.triedHref) {
       pendingJump.triedHref = true;
@@ -2635,6 +2662,13 @@ function attempt(fn, fallback) {
         attempt(() => clickElement(el), false);
         setPhase('searching', '正在展开课程模块…');
         logger.info(`展开课程模块：${String((el.parentElement && el.parentElement.textContent) || own).replace(/\s+/g, ' ').trim().slice(0, 40)}`);
+        pendingJump = {
+          item: { title: '展开模块', href: '' },
+          href: String(env.location.href || ''),
+          title: String(env.document.title || ''),
+          at: now(),
+          soft: true,
+        };
         return true;
       }
     }
