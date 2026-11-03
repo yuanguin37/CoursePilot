@@ -154,7 +154,7 @@ const TABS = ['overview', 'settings', 'logs'];const DEFAULT_CONFIG = Object.fre
   autoNext: true,
   /** 检测到弹题/答题弹窗时暂停托管，交由人工处理 */
   pauseOnObstacle: true,
-  /** 首次发现视频时自动弹出面板 */
+  /** 识别到课程内容（视频 / 图文 / 资料）时自动弹出面板，其他页面保持隐藏 */
   autoShow: true,
   /** 点击下一节前的缓冲时间（毫秒），给平台上报进度留出窗口 */
   nextDelayMs: 3000,
@@ -3924,11 +3924,15 @@ function isTopFrame(win) {
   win.__coursepilot = api;
   win.coursepilot = api;
 
-  if (config.get().panel.hidden) panel.hide();
+  // 面板不随页面加载自动弹出：先隐藏，等引擎识别到课程内容（视频 / 图文 / 资料）
+  // 再自动显示；门户、课程列表、登录等页面保持安静，需要时用油猴菜单或扩展按钮打开
+  panel.hide();
 
   let autoShown = false;
   engine.subscribe((state) => {
-    if (autoShown || !state.video) return;
+    if (autoShown) return;
+    const hasContent = state.content === 'video' || state.content === 'document' || state.content === 'material';
+    if (!hasContent) return;
     autoShown = true;
     if (config.get().autoShow && !config.get().panel.hidden) panel.show();
   });

@@ -29,7 +29,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   autoNext: true,
   /** 检测到弹题/答题弹窗时暂停托管，交由人工处理 */
   pauseOnObstacle: true,
-  /** 首次发现视频时自动弹出面板 */
+  /** 识别到课程内容（视频 / 图文 / 资料）时自动弹出面板，其他页面保持隐藏 */
   autoShow: true,
   /** 点击下一节前的缓冲时间（毫秒），给平台上报进度留出窗口 */
   nextDelayMs: 3000,

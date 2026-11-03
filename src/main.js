@@ -136,11 +136,15 @@ export function bootstrap(options = {}) {
   win.__coursepilot = api;
   win.coursepilot = api;
 
-  if (config.get().panel.hidden) panel.hide();
+  // 面板不随页面加载自动弹出：先隐藏，等引擎识别到课程内容（视频 / 图文 / 资料）
+  // 再自动显示；门户、课程列表、登录等页面保持安静，需要时用油猴菜单或扩展按钮打开
+  panel.hide();
 
   let autoShown = false;
   engine.subscribe((state) => {
-    if (autoShown || !state.video) return;
+    if (autoShown) return;
+    const hasContent = state.content === 'video' || state.content === 'document' || state.content === 'material';
+    if (!hasContent) return;
     autoShown = true;
     if (config.get().autoShow && !config.get().panel.hidden) panel.show();
   });
