@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CoursePilot 课程托管助手
 // @namespace    https://github.com/coursepilot
-// @version      1.9.0
+// @version      2.0.0
 // @description  多平台网课播放托管：倍速突破、自动续播、自动下一节、图形化控制面板（不答题、不伪造记录）
 // @author       CoursePilot
 // @match        *://*.yuketang.cn/*
@@ -23,7 +23,7 @@
   'use strict';
 
 // ---------- src/version.js ----------
-const APP_NAME = 'CoursePilot';const VERSION = '1.9.0';const STORAGE_KEY = 'coursepilot.config.v1';
+const APP_NAME = 'CoursePilot';const VERSION = '2.0.0';const STORAGE_KEY = 'coursepilot.config.v1';
 
 // ---------- src/util.js ----------
 function isFiniteNumber(value) {
@@ -1581,7 +1581,7 @@ function dedupe(candidates) {
     name: '雨课堂',
     quirk: 'xtplayer',
     hosts: ['yuketang.cn'],
-    listPages: ['/ci/web/index', '/web/list', '/web/myCourses', '/web/studentLog', '#tab/unfinished'],
+    listPages: ['/ci/web/index', '/web/list', '/web/myCourses', '/web/studentLog', '/web/study', '#tab/unfinished'],
     obstacle: ['.xt-popup', '.xt-exam-layer', '.question-wrap', '[class*="question-dialog"]'],
     next: ['.xt-next-btn', '[class*="next-video"]'],
     reader: ['.rich-text', '.markdown-body', '.lms-detail', '.xt-content'],
@@ -2231,7 +2231,28 @@ function attempt(fn, fallback) {
     const titleChanged = String(env.document.title || '') !== pendingNext.title;
     const srcChanged = currentVideoSrc() !== pendingNext.src;
     if (hrefChanged || titleChanged || srcChanged) {
+      // “下一节”点击导致导航：若落在列表/首页，判定为误点，跳回点击前页面
+      const landedBad = attempt(() => {
+        const url = new URL(String(env.location.href || ''));
+        return attempt(() => adapter.isListPage(), false)
+          || /^\/(index\/?)?$/i.test(url.pathname)
+          || /(\/ci\/web\/index|\/web\/list|\/web\/myCourses|\/web\/studentLog|\/home\b)/i.test(url.pathname);
+      }, false);
+      const backHref = pendingNext.href;
+      const fresh = now() - pendingNext.at < 8000;
       pendingNext = null;
+      if (landedBad && fresh && backHref) {
+        const win = env.window;
+        if (win && win.location && typeof win.location.assign === 'function') {
+          logger.warn('“下一节”点击把页面带回列表/首页，正在回退…');
+          try {
+            win.location.assign(backHref);
+            setPhase('searching', '已自动回退，请稍候…');
+          } catch {
+            /* 忽略 */
+          }
+        }
+      }
       return;
     }
     if (now() - pendingNext.at < 4000) return;
@@ -2526,6 +2547,9 @@ function attempt(fn, fallback) {
    * 避免在 A 站挑的按钮被拿到 B 站乱点；旧格式字符串（无 | ）仍全局生效。
    */
   function scopedNextSelector(cfg) {
+    // 用户拾取的“下一节”按钮只在**识别出真实课时内容**的页面上生效——
+    // 在列表/门户/资料页上点它就是把页面点走的主要事故源
+    if (state.content !== 'video' && state.content !== 'document') return '';
     const raw = String(cfg.nextSelector || '');
     const sep = raw.indexOf('|');
     if (sep <= 0) return raw;

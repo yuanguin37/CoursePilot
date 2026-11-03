@@ -282,7 +282,28 @@ export function createEngine({ config, logger, env }) {
     const titleChanged = String(env.document.title || '') !== pendingNext.title;
     const srcChanged = currentVideoSrc() !== pendingNext.src;
     if (hrefChanged || titleChanged || srcChanged) {
+      // “下一节”点击导致导航：若落在列表/首页，判定为误点，跳回点击前页面
+      const landedBad = attempt(() => {
+        const url = new URL(String(env.location.href || ''));
+        return attempt(() => adapter.isListPage(), false)
+          || /^\/(index\/?)?$/i.test(url.pathname)
+          || /(\/ci\/web\/index|\/web\/list|\/web\/myCourses|\/web\/studentLog|\/home\b)/i.test(url.pathname);
+      }, false);
+      const backHref = pendingNext.href;
+      const fresh = now() - pendingNext.at < 8000;
       pendingNext = null;
+      if (landedBad && fresh && backHref) {
+        const win = env.window;
+        if (win && win.location && typeof win.location.assign === 'function') {
+          logger.warn('“下一节”点击把页面带回列表/首页，正在回退…');
+          try {
+            win.location.assign(backHref);
+            setPhase('searching', '已自动回退，请稍候…');
+          } catch {
+            /* 忽略 */
+          }
+        }
+      }
       return;
     }
     if (now() - pendingNext.at < 4000) return;
@@ -577,6 +598,9 @@ export function createEngine({ config, logger, env }) {
    * 避免在 A 站挑的按钮被拿到 B 站乱点；旧格式字符串（无 | ）仍全局生效。
    */
   function scopedNextSelector(cfg) {
+    // 用户拾取的“下一节”按钮只在**识别出真实课时内容**的页面上生效——
+    // 在列表/门户/资料页上点它就是把页面点走的主要事故源
+    if (state.content !== 'video' && state.content !== 'document') return '';
     const raw = String(cfg.nextSelector || '');
     const sep = raw.indexOf('|');
     if (sep <= 0) return raw;
