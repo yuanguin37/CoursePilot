@@ -723,6 +723,8 @@ export function createEngine({ config, logger, env }) {
   }
 
   function autoDownloadTick() {
+    // 列表页守卫：任务列表里的条目链接不是资料，不能逐个点开
+    if (isMaterialListPage()) return;
     if (now() - lastDownloadAt <= 1500) return;
     const pending = materials.find((item) => !clickedMaterials.has(item.key));
     if (!pending) return;
