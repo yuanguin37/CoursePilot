@@ -21,11 +21,12 @@ export function createAdapter(href, env) {
     adapter[key] = (...args) => quirk[key]({ base, env, profile }, ...args);
   }
 
-  /** 平台声明的门户/列表页：这类 URL 不参与内容托管，引擎只做目录跳转 */
+  /** 平台声明的门户/列表页：这类 URL 不参与内容托管，引擎只做目录跳转。
+   *  用 路径 + hash 匹配（如雨课堂任务列表 /web/study?...#tab/unfinished）。 */
   adapter.isListPage = () => {
     try {
-      const path = String(env.location.pathname || '');
-      return (profile.listPages || []).some((pattern) => !!pattern && path.includes(pattern));
+      const target = String(env.location.pathname || '') + String(env.location.hash || '');
+      return (profile.listPages || []).some((pattern) => !!pattern && target.includes(pattern));
     } catch {
       return false;
     }

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CoursePilot 课程托管助手
 // @namespace    https://github.com/coursepilot
-// @version      1.3.0
+// @version      1.4.0
 // @description  多平台网课播放托管：倍速突破、自动续播、自动下一节、图形化控制面板（不答题、不伪造记录）
 // @author       CoursePilot
 // @match        *://*.yuketang.cn/*
@@ -23,7 +23,7 @@
   'use strict';
 
 // ---------- src/version.js ----------
-const APP_NAME = 'CoursePilot';const VERSION = '1.3.0';const STORAGE_KEY = 'coursepilot.config.v1';
+const APP_NAME = 'CoursePilot';const VERSION = '1.4.0';const STORAGE_KEY = 'coursepilot.config.v1';
 
 // ---------- src/util.js ----------
 function isFiniteNumber(value) {
@@ -1581,7 +1581,7 @@ function dedupe(candidates) {
     name: '雨课堂',
     quirk: 'xtplayer',
     hosts: ['yuketang.cn'],
-    listPages: ['/ci/web/index', '/web/list', '/web/myCourses'],
+    listPages: ['/ci/web/index', '/web/list', '/web/myCourses', '#tab/unfinished'],
     obstacle: ['.xt-popup', '.xt-exam-layer', '.question-wrap', '[class*="question-dialog"]'],
     next: ['.xt-next-btn', '[class*="next-video"]'],
     reader: ['.rich-text', '.markdown-body', '.lms-detail', '.xt-content'],
@@ -1939,11 +1939,12 @@ const QUIRK_TABLE = {
     adapter[key] = (...args) => quirk[key]({ base, env, profile }, ...args);
   }
 
-  /** 平台声明的门户/列表页：这类 URL 不参与内容托管，引擎只做目录跳转 */
+  /** 平台声明的门户/列表页：这类 URL 不参与内容托管，引擎只做目录跳转。
+   *  用 路径 + hash 匹配（如雨课堂任务列表 /web/study?...#tab/unfinished）。 */
   adapter.isListPage = () => {
     try {
-      const path = String(env.location.pathname || '');
-      return (profile.listPages || []).some((pattern) => !!pattern && path.includes(pattern));
+      const target = String(env.location.pathname || '') + String(env.location.hash || '');
+      return (profile.listPages || []).some((pattern) => !!pattern && target.includes(pattern));
     } catch {
       return false;
     }
@@ -2508,11 +2509,21 @@ function attempt(fn, fallback) {
    * 这种页面不计时、不点下一节，只按目录跳未读小节。
    */
   function isMaterialListPage() {
-    if (materials.length < 4) return false;
     const body = env.document.body;
     const text = String((body && body.textContent) || '');
     const markers = (text.match(/未开始|未完成|未学习|未读/g) || []).length;
-    return markers >= 4;
+    if (materials.length >= 4 && markers >= 4) return true;
+    // 页面充满“未开始/未读”标记时按列表页处理，除非资料里至少有一条
+    // 带真实文件后缀的链接（真资料页的形态）——防止任务列表被当资料托管
+    if (markers >= 6) {
+      const strong = materials.some((item) => attempt(() => (
+        /\.(pdf|docx?|pptx?|xlsx?|zip|rar|7z|mp4)(\?|#|$)/i.test(
+          String((item.el.getAttribute && item.el.getAttribute('href')) || ''),
+        )
+      ), false));
+      return !strong;
+    }
+    return false;
   }
 
   /** 统一的“切下一节”入口：下一节按钮 → 未完成小节 → 目录顺序，点完都做导航校验 */

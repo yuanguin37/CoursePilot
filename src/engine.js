@@ -560,11 +560,21 @@ export function createEngine({ config, logger, env }) {
    * 这种页面不计时、不点下一节，只按目录跳未读小节。
    */
   function isMaterialListPage() {
-    if (materials.length < 4) return false;
     const body = env.document.body;
     const text = String((body && body.textContent) || '');
     const markers = (text.match(/未开始|未完成|未学习|未读/g) || []).length;
-    return markers >= 4;
+    if (materials.length >= 4 && markers >= 4) return true;
+    // 页面充满“未开始/未读”标记时按列表页处理，除非资料里至少有一条
+    // 带真实文件后缀的链接（真资料页的形态）——防止任务列表被当资料托管
+    if (markers >= 6) {
+      const strong = materials.some((item) => attempt(() => (
+        /\.(pdf|docx?|pptx?|xlsx?|zip|rar|7z|mp4)(\?|#|$)/i.test(
+          String((item.el.getAttribute && item.el.getAttribute('href')) || ''),
+        )
+      ), false));
+      return !strong;
+    }
+    return false;
   }
 
   /** 统一的“切下一节”入口：下一节按钮 → 未完成小节 → 目录顺序，点完都做导航校验 */
